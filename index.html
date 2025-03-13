@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Resource Monitor</title>
+
+    <!-- Chart.js Library for Graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .chart-container {
+            width: 100%;
+            max-width: 700px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        /* Alert Box Styling */
+        #alert-box {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: red;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>System Resource Monitor</h1>
+
+    <!-- Alert Box -->
+    <div id="alert-box"></div>
+
+    <div class="container">
+        <button onclick="fetchMetrics()">Get System Metrics</button>
+        
+        <div class="chart-container">
+            <h3>CPU Usage Over Time</h3>
+            <canvas id="cpuChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h3>Memory Usage Over Time</h3>
+            <canvas id="memoryChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h3>Disk Usage Over Time</h3>
+            <canvas id="diskChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let cpuCtx = document.getElementById('cpuChart').getContext('2d');
+        let memoryCtx = document.getElementById('memoryChart').getContext('2d');
+        let diskCtx = document.getElementById('diskChart').getContext('2d');
+
+        let cpuChart = new Chart(cpuCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CPU Usage (%)',
+                    data: [],
+                    borderColor: 'blue',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Time' } },
+                    y: { title: { display: true, text: 'CPU Usage (%)' }, min: 0, max: 100 }
+                }
+            }
+        });
+
+        let memoryChart = new Chart(memoryCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Memory Usage (%)',
+                    data: [],
+                    borderColor: 'orange',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Time' } },
+                    y: { title: { display: true, text: 'Memory Usage (%)' }, min: 0, max: 100 }
+                }
+            }
+        });
+
+        let diskChart = new Chart(diskCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Disk Usage (%)',
+                    data: [],
+                    borderColor: 'red',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Time' } },
+                    y: { title: { display: true, text: 'Disk Usage (%)' }, min: 0, max: 100 }
+                }
+            }
+        });
+
+        function fetchMetrics() {
+            fetch('http://127.0.0.1:5000/metrics')
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Received data:", data);
+
+                    let currentTime = new Date().toLocaleTimeString();
+
+                    // Update CPU chart
+                    if (cpuChart.data.labels.length >= 10) {
+                        cpuChart.data.labels.shift();
+                        cpuChart.data.datasets[0].data.shift();
+                    }
+                    cpuChart.data.labels.push(currentTime);
+                    cpuChart.data.datasets[0].data.push(data.cpu_usage);
+                    cpuChart.update();
+
+                    // Update Memory chart
+                    if (memoryChart.data.labels.length >= 10) {
+                        memoryChart.data.labels.shift();
+                        memoryChart.data.datasets[0].data.shift();
+                    }
+                    memoryChart.data.labels.push(currentTime);
+                    memoryChart.data.datasets[0].data.push(data.memory_usage);
+                    memoryChart.update();
+
+                    // Update Disk chart
+                    if (diskChart.data.labels.length >= 10) {
+                        diskChart.data.labels.shift();
+                        diskChart.data.datasets[0].data.shift();
+                    }
+                    diskChart.data.labels.push(currentTime);
+                    diskChart.data.datasets[0].data.push(data.disk_usage);
+                    diskChart.update();
+
+                    // Show alert notification if CPU or Memory is high
+                    if (data.cpu_usage > 80) {
+                        showAlert("⚠️ High CPU Usage: " + data.cpu_usage + "%");
+                    }
+                    if (data.memory_usage > 90) {
+                        showAlert("⚠️ High Memory Usage: " + data.memory_usage + "%");
+                    }
+                })
+                .catch(error => console.error("Error fetching metrics:", error));
+        }
+
+        // Function to display alerts
+        function showAlert(message) {
+            let alertBox = document.getElementById("alert-box");
+            alertBox.innerHTML = message;
+            alertBox.style.display = "block";
+
+            // Hide alert after 5 seconds
+            setTimeout(() => {
+                alertBox.style.display = "none";
+            }, 5000);
+        }
+
+        // Auto-refresh data every 3 seconds
+        setInterval(fetchMetrics, 3000);
+    </script>
+
+</body>
+</html>
