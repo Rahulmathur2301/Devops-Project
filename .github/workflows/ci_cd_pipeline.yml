@@ -1,38 +1,25 @@
-name: CI/CD Pipeline
+name: Flask CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-      
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.9'
-      
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      
-      - name: Run Tests
-        run: |
-          pytest  # Ensure you have test cases written
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
     steps:
-      - name: Deploy to Server
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Build Docker Image
         run: |
-          echo "Deployment process goes here, e.g., Docker, Kubernetes, or cloud CLI commands."
+          docker build -t flask-app .
+          docker tag flask-app mydockerhub/flask-app:latest
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker push mydockerhub/flask-app:latest
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f kubernetes/deployment.yaml
